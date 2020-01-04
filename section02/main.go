@@ -12,11 +12,11 @@ import (
 	"os"
 )
 
-//「バイト列 b を書き込み、書き込んだバイト数 n と、エラーが起きた場合はそのエラー error を返す」という振る舞いを
+//「バイト列 p を書き込み、書き込んだバイト数 n と、エラーが起きた場合はそのエラー error を返す」という振る舞いを
 // インタフェース という型で定義している
 // いろいろなものを「ファイル」のように扱うために、システムコールではファイルディスクリプタ、Goではインタフェースを使って抽象化している
 //type Writer interface{
-//Write(b []byte) (n int, err error)
+//Write(p []byte) (n int, err error)
 //}
 func main() {
 	fmt.Println("Hello World!")
@@ -53,6 +53,8 @@ func connectionWrite() {
 	}
 	conn.Write([]byte("GET / HTTP/1.0\r\nHost: ascii.jp\r\n\r\n"))
 	// io.Copyはio.Readerからio.Writerにデータを渡すとき利用する
+	// https://ascii.jp/elem/000/001/252/1252961/
+	// 第3回   低レベルアクセスへの入り口（2）：io.Reader前編で説明される
 	io.Copy(os.Stdout, conn) // 第一引数：コピー先、第二引数：コピー元
 }
 
@@ -75,8 +77,8 @@ func multiWrite() {
 	}
 	// file.Write([]byte("os.File example\n"))
 	// os.Stdout.Write([]byte("os.Stdout example\n"))
-	writer := io.MultiWriter(file, os.Stdout)				// 書き出し先を指定する
-	io.WriteString(writer, "io.MultiWriter example\n")	// ファイル、標準出力の両方に同時に書き出す
+	writer := io.MultiWriter(file, os.Stdout)          // 書き出し先を指定する
+	io.WriteString(writer, "io.MultiWriter example\n") // ファイル、標準出力の両方に同時に書き出す
 }
 
 // 圧縮
@@ -95,7 +97,7 @@ func gzipWrite() {
 // 出力結果を一時的にためておいて、ある程度の分量ごとにまとめて書き出す
 // 参考：https://www.mas9612.net/posts/golang-bufio-writer/
 func bufioWrite() {
-	buffer := bufio.NewWriterSize(os.Stdout,8)
+	buffer := bufio.NewWriterSize(os.Stdout, 8)
 	buffer.WriteString("123456")
 	//buffer.Flush()
 	buffer.WriteString("abc\n")
