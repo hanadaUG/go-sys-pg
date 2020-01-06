@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/csv"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -12,7 +14,7 @@ import (
 )
 
 func main() {
-	sample05()
+	sample13()
 }
 
 // 必要な部位を切り出すio.LimitReader／io.SectionReader
@@ -167,4 +169,132 @@ func sample06() {
 	for _, chunk := range chunks[1:] {
 		io.Copy(newFile, chunk)
 	}
+}
+
+// 改行／単語で区切る
+var source1 = `1行目
+2行目
+3行目`
+
+func sample07() {
+	reader := bufio.NewReader(strings.NewReader(source1))
+	for {
+		line, err := reader.ReadString('\n') // 任意の文字で分割する
+		fmt.Printf("%#v\n", line)
+		if err == io.EOF {
+			break
+		}
+	}
+}
+
+var source2 = `1行目 2行目 3行目`
+
+// sample07をScannerで書き換えたコード
+// 競技プログラミングで標準入力を処理する時に多用する
+func sample08() {
+	scanner := bufio.NewScanner(strings.NewReader(source2))
+	// 分割処理を単語区切りに設定
+	scanner.Split(bufio.ScanWords)
+	for scanner.Scan() {
+		fmt.Printf("%#v\n", scanner.Text())
+	}
+}
+
+// データ型を指定して解析
+var source3 = "123 1.234 1.0e4 test"
+
+func sample09() {
+	reader := strings.NewReader(source3)
+	var i int
+	var f, g float64
+	var s string
+	fmt.Fscan(reader, &i, &f, &g, &s) // スペース区切りであることを前提としている
+	fmt.Printf("i=%#v f=%#v g=%#v s=%#v\n", i, f, g, s)
+}
+
+// その他の形式の決まったフォーマットの文字列の解析
+var csvSource = `13101,"100  ","1000003","ﾄｳｷｮｳﾄ","ﾁﾖﾀﾞｸ","ﾋﾄﾂﾊﾞｼ(1ﾁｮｳﾒ)","東京都","千代田区","一ツ橋（１丁目）",1,0,1,0,0,0
+13101,"101  ","1010003","ﾄｳｷｮｳﾄ","ﾁﾖﾀﾞｸ","ﾋﾄﾂﾊﾞｼ(2ﾁｮｳﾒ)","東京都","千代田区","一ツ橋（２丁目）",1,0,1,0,0,0
+13101,"100  ","1000012","ﾄｳｷｮｳﾄ","ﾁﾖﾀﾞｸ","ﾋﾋﾞﾔｺｳｴﾝ","東京都","千代田区","日比谷公園",0,0,0,0,0,0
+13101,"102  ","1020093","ﾄｳｷｮｳﾄ","ﾁﾖﾀﾞｸ","ﾋﾗｶﾜﾁｮｳ","東京都","千代田区","平河町",0,0,1,0,0,0
+13101,"102  ","1020071","ﾄｳｷｮｳﾄ","ﾁﾖﾀﾞｸ","ﾌｼﾞﾐ","東京都","千代田区","富士見",0,0,1,0,0,0
+`
+
+func sample10() {
+	reader := strings.NewReader(csvSource)
+	csvReader := csv.NewReader(reader)
+	for {
+		line, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		fmt.Println(line[2], line[6:9])
+	}
+}
+
+// ストリームを自由に操るio.Reader／io.Writer
+// 出力先を一つにまとめる
+func sample11() {
+	header := bytes.NewBufferString("----- HEADER -----\n")
+	content := bytes.NewBufferString("Example of io.MultiReader\n")
+	footer := bytes.NewBufferString("----- FOOTER -----\n")
+
+	reader := io.MultiReader(header, content, footer)
+	// すべてのreaderをつなげた出力が表示
+	io.Copy(os.Stdout, reader)
+}
+
+// 出力先を分岐させる
+func sample12() {
+	var buffer bytes.Buffer
+	reader := bytes.NewBufferString("Example of io.TeeReader\n")
+	teeReader := io.TeeReader(reader, &buffer)
+	// データを読み捨てる
+	_, _ = ioutil.ReadAll(teeReader)
+
+	// けどバッファに残ってる
+	fmt.Println(buffer.String())
+}
+
+// io.Pipe
+// https://golang.org/pkg/io/#example_Pipe
+// 参考
+// https://medium.com/eureka-engineering/file-uploads-in-go-with-io-pipe-75519dfa647b
+// https://christina04.hatenablog.com/entry/2017/01/06/190000
+// ただし「このstructをio.Readerとして渡したいなぁ」と思った時に、bytes.Bufferにエンコードすると一時的にそのデータを保持することになります。
+// 小さいデータならまだ良いですが、大きいデータを扱う場合はやはり無駄にメモリを消費してしまいます。
+// そこでio.Pipeを使うと特に内部バッファを保つ必要もなく、io.Readerとして渡すことが可能になります。
+// https://qiita.com/m0a/items/bba395b2fc9cd160e441
+// (1) bufferを準備(bytes.Buffer)
+// (2) bufferに対して動画等データなどの書き込み処理
+// (3) bufferをPOST処理に渡す。
+// 動画のサイズが大きいとbufferが実機のメモリを超えてしまい上手く動かなくなったようです
+// 変更後
+// (1) のbufferの代わりにio.Pipeのwriter側を準備
+// (2)の処理をgo routineとして並列実行
+// (3)のPOST処理にio.PipeのReader側を渡す
+// つまりPOST処理でデータが必要なタイミングではじめてfileからデータを読み込む動作になるわけです。
+//
+// ファイルを読み込みながらネットワークへの送信を行う挙動となるため ファイルサイズ分のバッファは不要となります
+// 遅延評価というやつです
+func sample13() {
+	fmt.Println("---------- main E")
+	r, w := io.Pipe()
+
+	fmt.Println("---------- call goroutine E")
+	go func() {
+		fmt.Println("---------- goroutine E")
+		fmt.Fprint(w, "some text to be read\n")
+		w.Close()
+		fmt.Println("---------- goroutine X")
+	}()
+	fmt.Println("---------- call goroutine X")
+
+	buf := new(bytes.Buffer)
+	fmt.Println("---------- Read E")
+	buf.ReadFrom(r)
+	fmt.Println("---------- Read X ")
+
+	fmt.Print(buf.String())
+	fmt.Println("---------- main X")
 }
